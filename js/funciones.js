@@ -1,4 +1,5 @@
 import UI from './class/UI.js';
+import { DB } from '../data/db.js'
 import Citas from './class/Citas.js';
 import { mascotaInput, fechaInput, horaInput, propietarioInput, sintomasInput, telefonoInput, formulario } from './selectores.js';
 
@@ -16,7 +17,7 @@ const citaObj = {
 
 /* Instanciar Las Clases De Forma Global */
 const administrarCitas = new Citas();
-const ui = new UI();
+// const ui = new UI();
 
 /* Funciones Programa */
 export function datosCitas(e) {
@@ -30,6 +31,7 @@ export function datosCitas(e) {
 
 /* Validar Y Agregar Una Nueva Cita */
 export function nuevaCita(e) {
+    const ui = new UI();
     e.preventDefault();
 
     const {
@@ -61,8 +63,20 @@ export function nuevaCita(e) {
         A Tomar Una Copia */
         administrarCitas.editarCita({...citaObj });
 
-        formulario.querySelector('button[type="submit"]').textContent = 'Crear Cita';
-        editando = false;
+        /* Editando En La Base De Datos IndexDB */
+        const transaction = DB.transaction(['citas'], 'readwrite');
+        const objectStore = transaction.objectStore('citas');
+
+        objectStore.put(citaObj);
+
+        transaction.oncomplete = () => {
+            formulario.querySelector('button[type="submit"]').textContent = 'Crear Cita';
+            editando = false;
+        }
+
+        transaction.onerror = () => {
+            console.log('Tenemos Un Error');
+        }
 
     } else {
         citaObj.id = Date.now();
@@ -73,13 +87,26 @@ export function nuevaCita(e) {
         A Tomar Una Copia */
         administrarCitas.agregarCita({...citaObj });
 
-        ui.imprimirAlerta('Se Agrego Correctamente');
+        /* Aqui Debemos Insgresar Los Datos En La Base De Datos IndexDB */
+        const transaction = DB.transaction(['citas'], 'readwrite');
+
+        /* Habilitar El Object Store */
+        const objectStore = transaction.objectStore('citas');
+
+        /* Insertar En La DB */
+        objectStore.add(citaObj);
+
+        transaction.oncomplete = function() {
+            // console.log('Cita Agregada');
+            ui.imprimirAlerta('Se Agrego Correctamente');
+        }
     }
 
     reiniciarObjeto();
     formulario.reset();
 
-    ui.imprimirCita(administrarCitas);
+    // ui.imprimirCita(administrarCitas);
+    ui.imprimirCita();
 }
 
 /* Reiniciar El Objeto */
@@ -93,14 +120,31 @@ export function reiniciarObjeto() {
 }
 
 export function eliminarCita(id) {
+    const ui = new UI();
+
     /* Eliminar Cita */
-    administrarCitas.eliminarCita(id);
+    // administrarCitas.eliminarCita(id);
+
+    /* Eliminar Una Cita Desde La Base De Datos IndexDB */
+    const transaction = DB.transaction(['citas'], 'readwrite');
+    const objectStore = transaction.objectStore('citas');
+
+    objectStore.delete(id);
+
+    transaction.oncomplete = () => {
+        console.log(`Cita ${id} Eliminada.......`);
+        ui.imprimirCita();
+    }
+
+    transaction.onerror = () => {
+        console.log('Hubo Un Error');
+    }
 
     /* Muestra Mensaje */
     ui.imprimirAlerta('La Cita Se Elimino Correctamente');
 
     /* Mostrar Cita */
-    ui.imprimirCita(administrarCitas);
+    // ui.imprimirCita(administrarCitas);
 }
 
 export function cargarEdicion(cita) {
